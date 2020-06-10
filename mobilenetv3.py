@@ -144,7 +144,9 @@ class MobileNetV3(nn.Module):
             exp_size = _make_divisible(input_channel * t, 8)
             layers.append(block(input_channel, exp_size, output_channel, k, s, use_se, use_hs))
             input_channel = output_channel
-        self.features = nn.Sequential(*layers)
+        
+        self.features = nn.ModuleList(layers)
+        #self.features = nn.Sequential(*layers)
         # building last several layers
         self.conv = conv_1x1_bn(input_channel, exp_size)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -160,12 +162,17 @@ class MobileNetV3(nn.Module):
         self._initialize_weights()
 
     def forward(self, x):
-        x = self.features(x)
+        out_features = []
+        for i in range(len(self.features)):
+            x = self.features[i](x)
+            if i in [1, 3, 6, 12, 15]:  
+                out_features.append(x)
+            #x = self.features(x)
         x = self.conv(x)
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
         x = self.classifier(x)
-        return x
+        return out_features
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -228,4 +235,13 @@ def mobilenetv3_small(**kwargs):
     ]
 
     return MobileNetV3(cfgs, mode='small', **kwargs)
+    
+    
+#import numpy as np
+#import torch
+#net_large = mobilenetv3_large().double()
+#net_large.load_state_dict(torch.load('pretrained/mobilenetv3-large-1cd25616.pth'))
+#x = torch.from_numpy(np.ones((1,3, 256,256)))
+#out = net_large(x.double())
+#print(out[0].shape)
 
